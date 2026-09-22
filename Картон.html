@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Картонтоль — Расчёт</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        /* Заголовок и дельта */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-top: 8px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        }
+
+        .delta {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ef5350;
+        }
+
+        /* Сетка полей ввода */
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .input-group {
+            flex: 1;
+            position: relative;
+        }
+
+        .input-group label {
+            position: absolute;
+            top: -8px;
+            left: 12px;
+            background-color: #000000;
+            padding: 0 4px;
+            font-size: 11px;
+            color: #9e9e9e;
+        }
+
+        .input-group input {
+            width: 100%;
+            background-color: transparent;
+            border: 1px solid #616161;
+            border-radius: 6px;
+            padding: 12px 14px;
+            font-size: 18px;
+            color: #ffffff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: #ffffff;
+        }
+
+        /* Прогресс-бар и обратный отсчет */
+        .progress-box {
+            margin: 14px 0 8px 0;
+            display: none; /* скрыт, пока нет расписания */
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .progress-next {
+            color: #9e9e9e;
+        }
+
+        .progress-remaining {
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background-color: #424242;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: #ef5350;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* Подзаголовок очереди */
+        .queue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0 10px 0;
+            color: #757575;
+            font-size: 14px;
+        }
+
+        /* Карточки рулонов */
+        .cards-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-bottom: 24px;
+        }
+
+        .card {
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border: 2px solid transparent;
+        }
+
+        /* Активная карточка, к которой идет отсчет */
+        .card.active-target {
+            border-color: #ffffff;
+        }
+
+        .card-day {
+            background-color: rgba(71, 71, 71, 0.7);
+        }
+
+        .card-night {
+            background-color: #0e2a4a;
+        }
+
+        .card-number {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 2px;
+        }
+
+        .card-time {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>РАСЧЁТ</h1>
+        <div id="diffText" class="delta"></div>
+    </div>
+
+    <!-- Блок справки -->
+    <div class="input-row">
+        <div class="input-group">
+            <label>Время 1 (Справка)</label>
+            <input type="text" id="time1" placeholder="00:00" maxlength="5" inputmode="numeric">
+        </div>
+        <div class="input-group">
+            <label>Время 2 (Справка)</label>
+            <input type="text" id="time2" placeholder="00:00" maxlength="5" inputmode="numeric">
+        </div>
+    </div>
+
+    <!-- Блок основных параметров -->
+    <div class="input-row">
+        <div class="input-group">
+            <label>Начало</label>
+            <input type="text" id="start" placeholder="00:00" maxlength="5" inputmode="numeric">
+        </div>
+        <div class="input-group">
+            <label>Среднее</label>
+            <input type="text" id="avg" placeholder="00:00" maxlength="5" inputmode="numeric">
+        </div>
+    </div>
+
+    <!-- Блок прогресс-бара -->
+    <div id="progressBox" class="progress-box">
+        <div class="progress-info">
+            <span id="nextShotNumber" class="progress-next">Следующий: №--</span>
+            <span id="remainingTimeText" class="progress-remaining">Осталось: --</span>
+        </div>
+        <div class="progress-track">
+            <div id="progressFill" class="progress-fill"></div>
+        </div>
+    </div>
+
+    <div class="queue-header">
+        <span>Очередь съемов (Расчёт):</span>
+    </div>
+
+    <div id="scheduleList" class="cards-list"></div>
+</div>
+
+<script>
+    const t1Input = document.getElementById('time1');
+    const t2Input = document.getElementById('time2');
+    const startInput = document.getElementById('start');
+    const avgInput = document.getElementById('avg');
+    const diffText = document.getElementById('diffText');
+    const scheduleList = document.getElementById('scheduleList');
+    const progressBox = document.getElementById('progressBox');
+    const nextShotNumber = document.getElementById('nextShotNumber');
+    const remainingTimeText = document.getElementById('remainingTimeText');
+    const progressFill = document.getElementById('progressFill');
+
+    // Ключи для localStorage
+    const STORAGE_KEYS = {
+        time1: 'karton_web_time1',
+        time2: 'karton_web_time2',
+        start: 'karton_web_start',
+        avg: 'karton_web_avg'
+    };
+
+    let currentSchedule = []; // Хранение рассчитанных минут для таймера
+
+    // Автоматическая маска ввода ЧЧ:ММ и сохранение
+    function applyTimeMask(input, key) {
+        input.addEventListener('input', () => {
+            let val = input.value.replace(/\D/g, '').substring(0, 4);
+            if (val.length >= 3) {
+                input.value = val.substring(0, 2) + ':' + val.substring(2);
+            } else {
+                input.value = val;
+            }
+            localStorage.setItem(key, input.value);
+            recalculate();
+        });
+    }
+
+    applyTimeMask(t1Input, STORAGE_KEYS.time1);
+    applyTimeMask(t2Input, STORAGE_KEYS.time2);
+    applyTimeMask(startInput, STORAGE_KEYS.start);
+    applyTimeMask(avgInput, STORAGE_KEYS.avg);
+
+    // Восстановление данных из localStorage при открытии
+    function loadSavedData() {
+        t1Input.value = localStorage.getItem(STORAGE_KEYS.time1) || '';
+        t2Input.value = localStorage.getItem(STORAGE_KEYS.time2) || '';
+        startInput.value = localStorage.getItem(STORAGE_KEYS.start) || '';
+        avgInput.value = localStorage.getItem(STORAGE_KEYS.avg) || '';
+        recalculate();
+    }
+
+    function parseMinutes(timeStr) {
+        if (!timeStr || timeStr.length !== 5) return null;
+        const [h, m] = timeStr.split(':').map(Number);
+        if (isNaN(h) || isNaN(m) || h > 23 || m > 59) return null;
+        return h * 60 + m;
+    }
+
+    function formatTime(totalMinutes) {
+        const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+        const h = Math.floor(normalized / 60).toString().padStart(2, '0');
+        const m = (normalized % 60).toString().padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    function recalculate() {
+        // 1. Расчет дельты справки
+        const t1 = parseMinutes(t1Input.value);
+        const t2 = parseMinutes(t2Input.value);
+
+        if (t1 !== null && t2 !== null) {
+            let diff = t2 - t1;
+            if (diff <= 0) diff += 1440;
+            const diffH = Math.floor(diff / 60).toString().padStart(2, '0');
+            const diffM = (diff % 60).toString().padStart(2, '0');
+            diffText.innerText = `Δ ${diffH}:${diffM}`;
+        } else {
+            diffText.innerText = '';
+        }
+
+        // 2. Расчет очереди рулонов
+        const startMins = parseMinutes(startInput.value);
+        const avgMins = parseMinutes(avgInput.value);
+
+        scheduleList.innerHTML = '';
+        currentSchedule = [];
+
+        if (startMins !== null && avgMins !== null && avgMins > 0) {
+            const maxShots = 20;
+
+            for (let i = 0; i < maxShots; i++) {
+                const shotTimeMinutes = startMins + (avgMins * i);
+                currentSchedule.push({
+                    number: i + 1,
+                    minutes: shotTimeMinutes,
+                    formatted: formatTime(shotTimeMinutes)
+                });
+
+                const dayStart = 8 * 60 + 30;
+                const dayEnd = 20 * 60 + 30;
+                const currentDayMinute = ((shotTimeMinutes % 1440) + 1440) % 1440;
+                const isDay = currentDayMinute >= dayStart && currentDayMinute < dayEnd;
+
+                const card = document.createElement('div');
+                card.id = `card-shot-${i + 1}`;
+                card.className = `card ${isDay ? 'card-day' : 'card-night'}`;
+                card.innerHTML = `
+                    <div class="card-number">${i + 1} рулон</div>
+                    <div class="card-time">${formatTime(shotTimeMinutes)}</div>
+                `;
+                scheduleList.appendChild(card);
+            }
+            progressBox.style.display = 'block';
+            updateTimer();
+        } else {
+            progressBox.style.display = 'none';
+        }
+    }
+
+    // Логика таймера обратного отсчета и прогресс-бара
+    function updateTimer() {
+        if (!currentSchedule.length) return;
+
+        const now = new Date();
+        const currentNowMinutes = now.getHours() * 60 + now.getMinutes() + (now.getSeconds() / 60);
+
+        // Находим первый рулон, чье время строго позже текущего
+        let nextIndex = currentSchedule.findIndex(shot => {
+            let diff = (shot.minutes % 1440) - (currentNowMinutes % 1440);
+            if (diff < 0) diff += 1440;
+            return diff > 0 && diff <= 720; // Окно прогнозирования до 12 часов
+        });
+
+        // Снимаем подсветку со всех карточек
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('active-target'));
+
+        if (nextIndex === -1) {
+            nextShotNumber.innerText = 'Все съемы завершены';
+            remainingTimeText.innerText = '';
+            progressFill.style.width = '100%';
+            return;
+        }
+
+        const targetShot = currentSchedule[nextIndex];
+
+        // Подсвечиваем активную карточку белой рамкой
+        const activeCard = document.getElementById(`card-shot-${targetShot.number}`);
+        if (activeCard) activeCard.classList.add('active-target');
+
+        // Расчет интервала между прошлым рулоном и целевым
+        let prevMinutes = (nextIndex > 0)
+            ? currentSchedule[nextIndex - 1].minutes % 1440
+            : (targetShot.minutes - 60) % 1440;
+
+        let targetMinutes = targetShot.minutes % 1440;
+
+        let totalInterval = targetMinutes - prevMinutes;
+        if (totalInterval <= 0) totalInterval += 1440;
+
+        let elapsed = (currentNowMinutes % 1440) - prevMinutes;
+        if (elapsed < 0) elapsed += 1440;
+
+        let progressPercent = Math.min(Math.max((elapsed / totalInterval) * 100, 0), 100);
+        progressFill.style.width = `${progressPercent}%`;
+
+        // Расчет оставшегося времени
+        let remainingMinutesTotal = Math.floor(targetMinutes - (currentNowMinutes % 1440));
+        if (remainingMinutesTotal < 0) remainingMinutesTotal += 1440;
+
+        const hoursLeft = Math.floor(remainingMinutesTotal / 60);
+        const minsLeft = remainingMinutesTotal % 60;
+
+        nextShotNumber.innerText = `Следующий: №${targetShot.number}`;
+        remainingTimeText.innerText = (hoursLeft > 0)
+            ? `Осталось: ${hoursLeft}ч ${minsLeft}мин`
+            : `Осталось: ${minsLeft}мин`;
+    }
+
+    // Запуск таймера каждую секунду
+    setInterval(updateTimer, 1000);
+
+    // Старт приложения
+    loadSavedData();
+</script>
+</body>
+</html>
+
